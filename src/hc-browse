@@ -3,24 +3,36 @@
 # Because a child process can't affect its parent's environment,
 # hc-mcd must be defined as a shell built-in. It's hairy, but that's
 # OK because it's also tiny.
+
+# This script must be sourced into your shell environment with:
 #
-# It takes 1 optional argument which if supplied directs a change in
-# the 'current' metric position (ie. updates $HC_MCWD). It also prints
-# the final path. Its argument can be one of 4 forms:
+#   . hc-browse
+#
+#   (You may need to supply the full path to hc-browse)
+#
+# It defines the functions hc-mcd (and hc-mpwd because it's _really_
+# tiny). It also initialises HC_MCWD to a sane default and ensures
+# that HC_GRAPHITE is exported. If you do not with to use this script
+# then you will need to consider whether to set the HC_MCWD and
+# HC_GRAPHITE variables yourself.
 
-# .  Go to '.'
-# .. Go up one level, or stay at '.'
-# Begins with '.':
-#    Go to the absolute path supplied.
-# Anything else:
-#    Go to the supplied path appended to the 'current' path.
+# hc-mcd takes 1 optional argument which if supplied directs a change
+# in the 'current' metric position (ie. updates HC_MCWD). It prints
+# the current metric position after processing the argument which can
+# be in one of 4 forms:
+#   .  Go to '.'
+#   .. Go up one level, or stay at '.'
+#   Begins with '.':
+#      Go to the absolute path supplied.
+#   Anything else:
+#      Go to the supplied path appended to the 'current' path.
 
-# Absolutely no validation is performed. It's up to any utilities to
-# check the validity of $HC_MCWD. TODO: Consider $HC_OLD_MCWD for
-# typos etc (but not craziness like lists of history).
+# Absolutely no validation is performed on the final HC_MCWD
+# string. It's up to any utilities which use the environment to check
+# the its validity.
 
-# This script also initialises HC_MCWD to a sane default and ensures
-# that HC_GRAPHITE is exported.
+# TODO: Consider HC_OLD_MCWD for typos etc. (but not craziness like
+# lists of history).
 
 [ x"$HC_GRAPHITE" != x ] && export HC_GRAPHITE
 export HC_MCWD=${HC_MCWD:-.}
