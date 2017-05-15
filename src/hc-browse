@@ -34,6 +34,7 @@ hc-mcd() {
   elif [ x"$1" = x.. ]; then
     if [ x"$HC_MCWD" != x. ]; then # Otherwise do nothing
       HC_MCWD=$(hc-mpwd | sed -r 's/\.([^.]+)$//')
+      : ${HC_MCWD:=.}
     fi
   elif [ x"$1" != x ]; then
     if [ x"${1##.*}" = x ]; then
