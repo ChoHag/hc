@@ -1,0 +1,79 @@
+#!/usr/bin/env perl
+#! perl -T <-- how to force?
+
+use v5.10;
+use strictures 2;
+use Moo;
+use Carp;
+
+use HC::Graphite;
+
+
+# Examine and sanitise environmant
+
+sub _check_environment {
+  my ($var, $rx, $default, $name) = @_;
+  my $evil_eval = qq<
+    (defined $var and length $var)
+      ? do {
+        $var =~ \$rx or die "Invalid \$name: $var";
+        \$1;
+      }
+      : \$default;
+  >;
+  my $r = eval $evil_eval; die $@ if $@; # Somehow the fact that this
+                                         # included 'at (wherever)'
+                                         # remains, even after it's
+                                         # removed, and it is not
+                                         # reapplied.
+  $r;
+}
+
+my $shitty_match = qr([a-zA-Z0-9_*{},\[\]-]+); # Yeah...
+
+my $endpoint = _check_environment('$ENV{HC_GRAPHITE}',
+                                  qr((?x)
+                                    ^(
+                                      .* # Whatever
+                                    )$),
+                                  'http://localhost/graphite',
+                                  'HC_GRAPHITE environment variable');
+
+my $mcwd = _check_environment('$ENV{HC_MCWD}', qr((?x)
+                              ^(
+                                \.
+                              |
+                                (?:\.$shitty_match)+
+                              )$),
+                              '.',
+                              'HC_MCWD environment variable');
+
+my $path = _check_environment('$ARGV[0]', qr((?x)
+                              ^(
+                                \.\.?
+                              |
+                                (?:\.$shitty_match)+\.?
+                              |
+                                $shitty_match(?:\.$shitty_match)*\.?
+                              )$),
+                              $mcwd eq '.' ? $mcwd : "$mcwd.",
+                              'path');
+
+# Find out where to really look based on the (only (optional)
+# command-line argument:
+#  nothing  Look in $ENV{HC_MCWD}
+#  '..'     Look in the parent of $ENV{HC_MCWD} (ie. all but the last '.<thing>')
+#  /^\./    Look in the absolute path given (including '.')
+#  /^[^.]/  Look in the absolute path of $ENV{HC_MCWD}.<whatever>
+#  /\.$/    Look for everything in $ENV{HC_MCWD} (append '*')
+sub parent { shift =~ s/\.([^.]+)$//r }
+my $where = substr($path,0,1) eq '.' ? $path : "$mcwd.$path";
+$where = parent($mcwd) . '.*' if $where eq '..';
+$where .= '*' if substr($where,-1,1) eq '.';
+my $graphite = HC::Graphite->new(endpoint => $endpoint);
+my $what = $graphite->perl_metrics(find => $where)->get;
+
+say "$where:";
+for (@$what) {
+  say sprintf '%s %s', ($_->{expandable} ? '+' : ' '), $_->{text};
+}

@@ -1,0 +1,50 @@
+#!sh
+
+# Because a child process can't affect its parent's environment,
+# hc-mcd must be defined as a shell built-in. It's hairy, but that's
+# OK because it's also tiny.
+#
+# It takes 1 optional argument which if supplied directs a change in
+# the 'current' metric position (ie. updates $HC_MCWD). It also prints
+# the final path. Its argument can be one of 4 forms:
+
+# .  Go to '.'
+# .. Go up one level, or stay at '.'
+# Begins with '.':
+#    Go to the absolute path supplied.
+# Anything else:
+#    Go to the supplied path appended to the 'current' path.
+
+# Absolutely no validation is performed. It's up to any utilities to
+# check the validity of $HC_MCWD. TODO: Consider $HC_OLD_MCWD for
+# typos etc (but not craziness like lists of history).
+
+# This script also initialises HC_MCWD to a sane default and ensures
+# that HC_GRAPHITE is exported.
+
+[ x"$HC_GRAPHITE" != x ] && export HC_GRAPHITE
+export HC_MCWD=${HC_MCWD:-.}
+
+# This is useful while I'm building things. It's not part of HC's API.
+alias hc-j2y="perl -MYAML -MJSON -ne 'print Dump(JSON->new->decode(\$_))'"
+
+hc-mcd() {
+  if [ x"$1" = x. ]; then
+    HC_MCWD=.
+  elif [ x"$1" = x.. ]; then
+    if [ x"$HC_MCWD" != x. ]; then # Otherwise do nothing
+      HC_MCWD=$(hc-mpwd | sed -r 's/\.([^.]+)$//')
+    fi
+  elif [ x"$1" != x ]; then
+    if [ x"${1##.*}" = x ]; then
+      HC_MCWD=${1%.}
+    elif [ x"${HC_MCWD}" = x. ]; then
+      HC_MCWD=".${1%.}"
+    else
+      HC_MCWD="$HC_MCWD.${1%.}"
+    fi
+  fi
+  hc-mpwd # TODO: Silencable?
+}
+
+hc-mpwd() { echo "$HC_MCWD"; }

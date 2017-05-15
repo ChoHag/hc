@@ -1,0 +1,19 @@
+# Editor detritus and backups
+*~
+*.bak
+*.new
+*.old
+*.orig
+.*.sw[pon]
+.dir-locals.el
+.#*
+\#*
+
+# Everything else
+blib
+_build
+Build
+collection
+MANIFEST
+MYMETA.json
+MYMETA.yml
