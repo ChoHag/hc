@@ -32,7 +32,7 @@ my $where = substr($path,0,1) eq '.'
 $where = parent($cli->mcwd) . '.*' if $where eq '..';
 $where .= '*' if substr($where,-1,1) eq '.';
 my $graphite = HC::Graphite->new(endpoint => $cli->graphite);
-my $what = $graphite->perl_metrics(find => $where)->get;
+my $what = $graphite->metrics_asperl(find => $where)->get;
 
 say "$where:";
 for (@$what) {

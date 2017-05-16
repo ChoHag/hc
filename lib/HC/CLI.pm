@@ -89,9 +89,12 @@ sub _check_environment {
 
 my %_possible_argument = (
   standard => {
-    from  => 'from=s',
-    until => 'until=s',
-    tag   => '@tag=s',
+    format => 'format=s',
+    from   => 'from=s',
+    until  => 'until=s',
+    tag    => '@tag=s',
+    width  => 'width=i',
+    height => 'height=i',
   },
 );
 
@@ -102,10 +105,10 @@ has user_arguments => is => lazy => builder => sub { [ @ARGV ] };
 has _standard_arguments => is => ro => init_arg => standard_arguments =>
   default => sub { [] },
   isa     => sub {
-    die 'standard_arguments must be an arrayref of legal scalars'
-      unless ref($_[0])||'' eq 'ARRAY'
-        and all { not ref $_
-                    and exists $_possible_argument{standard}{$_} } @{$_[0]};
+    #die 'standard_arguments must be an arrayref of legal scalars'
+    #  unless 0 and ref($_[0])||'' eq 'ARRAY'
+    #    and all { not ref $_
+    #                and exists $_possible_argument{standard}{$_} } @{$_[0]};
   };
 
 sub standard_arguments { @{ $_[0]->_standard_arguments } }

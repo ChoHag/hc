@@ -1,0 +1,52 @@
+#!/usr/bin/env perl
+#! perl -T <-- how to force?
+
+use v5.10;
+use strictures 2;
+use Carp;
+
+use PerlX::Maybe;
+use HC::CLI;
+use HC::Graphite;
+
+
+# Examine and sanitise environmant
+
+my $cli = HC::CLI->new(
+  standard_arguments => [qw(format width height)],
+);
+
+my ($cli_path) = @{ $cli->user_arguments };
+
+my $path = $cli->_check_environment(path =>
+  variable => \$cli_path,
+  default  => $cli->mcwd,
+);
+
+# Find out what to really alias based on the second (optional)
+# command-line argument:
+#  nothing  Alias $ENV{HC_MCWD}
+#  '..'     Alias the parent of $ENV{HC_MCWD} (ie. all but the last '.<thing>')
+#  /^\./    Alias the absolute path given (including '.')
+#  /^[^.]/  Alias the absolute path of $ENV{HC_MCWD}.<whatever>
+#  /\.$/    Invalid
+sub parent { shift =~ s/\.([^.]+)$//r }
+my $where = substr($path,0,1) eq '.'
+  ? $path
+  : ($cli->mcwd eq '.' ? $cli->mcwd . $path : $cli->mcwd . ".$path");
+$where = parent($cli->mcwd) if $where eq '..';
+die "Invalid path: $where" if length $where > 1 and substr($where,-1,1) eq '.';
+
+
+my $graphite = HC::Graphite->new(
+  # How format and other graphing options?
+  #  terminal/format
+  #  size
+  #  ranges
+  #  etc.
+  endpoint => $cli->graphite);
+print $graphite->plot($where =~ s/^\.//r,
+                      maybe format => $cli->user_options->{format},
+                      maybe width  => $cli->user_options->{width},
+                      maybe height => $cli->user_options->{height},
+                     )->get;

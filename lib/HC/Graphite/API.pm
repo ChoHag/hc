@@ -7,6 +7,7 @@ use Carp;
 
 use Memoize;
 use Net::Async::HTTP;
+use PerlX::Maybe;
 use namespace::clean;
 
 with 'HC::Role::Async';
@@ -104,23 +105,39 @@ index[.json]
 
 =cut
 
+my %_allowed_metrics_params = (
+  find   => [qw(wildcards from until position)],
+  expand => [qw(groupByExpr leavesOnly)],
+  index  => [],
+);
+$_allowed_metrics_params{'index.json'} = $_allowed_metrics_params{index}; # FFS
+
 sub metrics {
   my $self = shift;
   my ($method, $query, %extra) = @_;
   $method = 'index.json' if $method eq 'index';
+  return Future->fail("Invalid metrics method: $method")
+    unless exists $_allowed_metrics_params{$method};
   my $uri = URI->new($self->endpoint . "metrics/$method");
-  $uri->query_form(%extra, query => $query);
+  my %query = (
+    maybe query => $query, # No query in index
+    map { maybe $_ => $extra{$_} } @{ $_allowed_metrics_params{$method} },
+  );
+  # Only if .../find. default_* stupid?
+  $query{from}  ||= $self->default_from  if $self->has_default_from;
+  $query{until} ||= $self->default_until if $self->has_default_until;
+  $uri->query_form(%query);
   $self->_download($uri)->then(sub { Future->done($_[0]->content) });
 }
 
-=item perl_metrics ($method, $query, [%extra])
+=item metrics_asperl ($method, $query, [%extra])
 
 Calls C<metrics> with the same arguments and decodes the result, which
 is assumed to be JSON text, into a perl data structure.
 
 =cut
 
-sub perl_metrics {
+sub metrics_asperl {
   my $self = shift;
   $self->metrics(@_)->then(sub { Future->done($self->_json->decode(shift)); });
 }
@@ -160,7 +177,12 @@ sub render {
   my $self = shift;
   my ($format, $target, %extra) = @_;
   my $uri = URI->new($self->endpoint . 'render');
-  $uri->query_form(%extra, format => $format, target => $target);
+  my %query = (
+    format => $format,
+    target => $target,
+    map { maybe $_ => $extra{$_} } qw(graphType jsonp maxDataPoints noNullPoints), # Many more
+  );
+  $uri->query_form(%query);
   $self->_download($uri)->then(sub { Future->done($_[0]->content) });
 }
 
@@ -176,6 +198,21 @@ for my $format (qw(
 )) {
   no strict 'refs';
   *{$format} = sub { $_[0]->render($format => @_[1..$#_]) };
+}
+
+sub render_asperl {
+  my $self = shift;
+  $self->render(raw => @_)->then(sub {
+    my @sets = map {
+      chomp;
+      my ($head, $data) = split /\|/;
+      my %set;
+      (@set{qw(target start end step)}) = split /,/, $head;
+      $set{data} = [ split /,/, $data ];
+      \%set;
+    } split /\n/, $_[0];
+    Future->done(@sets);
+  });
 }
 
 =item find_target_from_spec ($spec, ...)

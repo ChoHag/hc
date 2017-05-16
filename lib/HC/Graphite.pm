@@ -45,6 +45,10 @@ with 'HC::Graphite::API';
 
 with 'HC::Graphite::Draw';
 
+has default_from => is => rw => predicate => 1;
+
+has default_until => is => rw => predicate => 1;
+
 1;
 
 =back
